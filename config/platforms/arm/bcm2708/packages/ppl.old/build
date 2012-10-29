@@ -1,0 +1,22 @@
+#!/bin/sh
+
+. config/options
+get_meta $1
+
+cd $PKG_BUILD_DIR
+
+setup_toolchain host
+
+
+do_configure host \
+	--host=$HOST_NAME \
+        --build=$HOST_NAME \
+	--target=$TARGET_NAME \
+	--enable-interfaces="c,cxx" \
+	--with-gmp="$ROOT/$TOOLCHAIN" \
+	--enable-shared \
+        --disable-static \
+
+
+make -j1
+make_install toolchain

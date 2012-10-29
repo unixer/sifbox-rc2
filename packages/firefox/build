@@ -1,0 +1,119 @@
+#!/bin/sh
+
+. config/options
+
+export LD_LIBRARY_PATH=$SYSROOT_PREFIX/lib:$SYSROOT_PREFIX/usr/lib:$SYSROOT_PREFIX/usr/local/lib:/usr/local/src/openbricks.beta6/build/build.i386.eglibc/firefox-14.0.1/firefox-build-dir:$LD_LIBRARY_PATH
+
+export MAKEFLAGS=-j1
+#CFLAGS="$CFLAGS -I$SYSROOT_PREFIX/usr/include"
+#LDFLAGS="$LDFLAGS -L$SYSROOT_PREFIX/lib -L$SYSROOT_PREFIX/usr/lib -L$SYSROOT_PREFIX/usr/local/lib"
+#CFLAGS=`echo $CFLAGS | sed -e "s|-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS==64||"`
+#CFLAGS=`echo $CFLAGS | sed -e "s|-D_FILE_OFFSET_BITS=64||"`
+#CFLAGS=`echo $CFLAGS | sed -e "s|-D_LARGEFILE_SOURCE||"`
+#CFLAGS=`echo $CFLAGS | sed -e "s|-D_FILE_OFFSET_BITS==64||"`
+#CXXFLAGS=`echo $CXXFLAGS | sed -e "s|-D_FILE_OFFSET_BITS==64||"`
+get_meta $1
+cd $PKG_BUILD_DIR
+
+echo $TARGET_NAME
+echo $HOST_ARCH
+echo $HOST_NAME
+cat > mozconfig << EOF
+
+# sh
+# Build configuration script
+#
+# See http://www.mozilla.org/build/unix.html for build instructions.
+#
+CROSS_COMPILE=1
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/firefox-build-dir
+
+#HOST_LIBIDL_CONFIG='/usr/bin/libIDL-config-2 --prefix=/usr'
+HOST_LIBIDL_CFLAGS='-I/usr/include/libIDL-2.0 -I/usr/local/src/openbricks.beta6/build/build.i386.eglibc/toolchain/i686-openbricks-linux-gnu/sysroot/usr/glib-2.0 -I//usr/local/src/openbricks.beta6/build/build.i386.eglibc/toolchain/i686-openbricks-linux-gnu/sysroot/usr/glib-2.0/include'
+#HOST_LIBIDL_LIBS='-L/usr/lib -lIDL-2 -lglib-2.0'
+#LIBIDL_CONFIG='/usr/bin/libIDL-config-2 --prefix=/usr/mipsEEel-linux'
+export PKG_CONFIG_PATH=/usr/local/src/openbricks.beta6/build/build.i386.eglibc/toolchain/i686-openbricks-linux-gnu/sysroot/usr/local/lib/pkgconfig/
+
+# don't use pkg-config for host libIDL
+ac_add_options --without-libIDL
+ac_add_options --prefix=/usr/local/src/openbricks.beta6/build/build.i386.eglibc/toolchain/
+#ac_add_options  --target=i686-pc-linux-gnu
+#ac_add_options  --host=i686-pc-linux-gnu
+ac_add_options	--disable-accessibility
+ac_add_options	--disable-activex
+ac_add_options	--disable-activex-scripting
+#ac_add_options  --enable-official_branding anyway 
+
+
+
+# Options for 'configure' (same as command-line options). 
+# all are listed so that one can manually tweak this config file.
+ac_add_options --enable-application=browser
+ac_add_options --enable-mathml
+#ac_add_options --enable-extensions
+#ac_add_options --enable-crypto
+ac_add_options --enable-logrefcnt
+
+ac_add_options --enable-optimize=-O2 
+
+ac_add_options --without-system-nspr
+ac_add_options --without-system-zlib
+ac_add_options --without-system-jpeg
+ac_add_options --without-system-png
+ac_add_options --disable-libnotify
+ac_add_options --disable-necko-wifi
+ac_add_options --disable-freetypetest
+ac_add_options --disable-pango
+ac_add_options --enable-system-ffi
+ac_add_options --disable-elf-hack
+
+EOF
+
+sed -i 's/\(MOZ_PKG_FATAL_WARNINGS =\).*/\1 0/' \
+  browser/installer/Makefile.in &&
+
+#sed -i 's# ""##' browser/base/Makefile.in && 
+#sed -i "s|-D_FILE_OFFSET_BITS=64||" modules/libbz2/src/Makefile.in
+#sed -i "s|-D_FILE_OFFSET_BITS=64||" toolkit/crashreporter/google-breakpad/src/client/windows/build/common.gypi
+
+#make CROSS="$TARGET_PREFIX" -f client.mk
+#make -f client.mk 
+make -f client.mk configure
+make -f client.mk build
+sed -i "s|-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE||" firefox-build-dir/config/autoconf.mk
+sed -i "s|-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE||" firefox-build-dir/config/autoconf.mk
+sed -i "s|-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE||" firefox-build-dir/config.log
+sed -i "s|-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE||" firefox-build-dir/nsprpub/config/autoconf.mk
+sed -i "s|-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE||" firefox-build-dir/nsprpub/config.status
+sed -i "s|-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE||" firefox-build-dir/js/src/config/autoconf.mk
+sed -i "s|-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE||" firefox-build-dir/config.status
+sed -i "s|-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE||" firefox-build-dir/js/src/config.log
+sed -i "s|-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE||" firefox-build-dir/js/src/config.status
+
+#make CROSS="$TARGET_PREFIX" -f client.mk
+
+#make CROSS="$TARGET_PREFIX" -C firefox-build-dir/browser/installer
+
+
+#mkdir -p .install/usr/lib/firefox-14.0.1 
+#tar -xvf firefox-build-dir/dist/firefox-14.0.1.en-US.linux-$TARGET_ARCH.tar.bz2 -C .install/usr/lib/firefox-14.0.1 --strip-components=1 
+
+do_strip bin lib*.so.*
+
+cd .install
+mkdir -p usr/bin
+ln -sfv ../lib/firefox-14.0.1/firefox usr/bin
+
+mkdir -pv usr/lib/mozilla/plugins
+ln -sfv ../mozilla/plugins usr/lib/firefox-14.0.1
+
+
+
+
+
+
+
+#do_configure
+#make
+#do_strip bin libfirefox.so.*
+#make_install

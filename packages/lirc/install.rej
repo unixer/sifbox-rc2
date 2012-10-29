@@ -1,0 +1,8 @@
+--- packages/lirc/install	Sat Sep 01 15:23:51 2012 +0200
++++ packages/lirc/install	Sat Sep 01 18:04:46 2012 +0200
+@@ -16,3 +16,5 @@
+ mkdir -p $INSTALL/etc/lirc
+ cp remotes/mceusb/lircd.conf.mceusb $INSTALL/etc/lirc/lircd.conf
+ cp remotes/devinput/lircd.conf.devinput $INSTALL/etc/lirc
++cp -R remotes $INSTALL/etc/lirc
++cp $ROOT/$PACKAGES/$1/config/* $INSTALL/etc/lirc

@@ -1,0 +1,326 @@
+--- vdr.old/channels.h	2012-09-10 16:56:08.000000000 +0200
++++ vdr/channels.h	2012-09-10 17:21:48.000000000 +0200
+@@ -14,6 +14,7 @@
+ #include "sources.h"
+ #include "thread.h"
+ #include "tools.h"
++#include <vector>
+ 
+ #define ISTRANSPONDER(f1, f2)  (abs((f1) - (f2)) < 4) //XXX
+ 
+@@ -104,6 +105,9 @@
+   friend class cSchedules;
+   friend class cMenuEditChannel;
+   friend class cDvbSourceParam;
++  friend class cMenuMyEditChannel;
++  friend class cMenuMyBouquets;
++  friend class cMenuEditBouquet;
+ private:
+   static cString ToText(const cChannel *Channel);
+   char *name;
+@@ -204,6 +208,7 @@
+   int Number(void) const { return number; }
+   void SetNumber(int Number) { number = Number; }
+   bool GroupSep(void) const { return groupSep; }
++  void SetGroupSep(bool GroupSep) { groupSep=GroupSep; }
+   const char *Parameters(void) const { return parameters; }
+   const cLinkChannels* LinkChannels(void) const { return linkChannels; }
+   const cChannel *RefChannel(void) const { return refChannel; }
+@@ -249,6 +254,7 @@
+ #ifdef USE_ALTERNATECHANNEL
+   bool LoadAlternativeChannels(const char *FileName);
+ #endif /* ALTERNATECHANNEL */
++  bool Reload(const char *FileName, bool AllowComments = false, bool MustExist = false);
+   void HashChannel(cChannel *Channel);
+   void UnhashChannel(cChannel *Channel);
+   int GetNextGroup(int Idx);   // Get next channel group
+--- vdr.old/config.h	2012-09-10 16:56:08.000000000 +0200
++++ vdr/config.h	2012-09-10 17:09:05.000000000 +0200
+@@ -13,6 +13,7 @@
+ #include <arpa/inet.h>
+ #include <stdio.h>
+ #include <stdlib.h>
++#include <string>
+ #include <string.h>
+ #include <time.h>
+ #include <unistd.h>
+@@ -388,6 +389,16 @@
+   int ChannelsWrap;
+   int ShowChannelNamesWithSource;
+   int EmergencyExit;
++  int ExpertOptions;
++  int AddNewChannels;
++  int UseBouquetList;
++  int OnlyRadioChannels;
++  int OnlyEncryptedChannels;
++  int OnlyHDChannels;
++  int ExpertNavi;
++  int WantChListOnOk;
++  int ChannelUpDownKeyMode; // 0 Normal, jumps to next or previous channel
++                            // 1 opens bouquet / channel list
+ #ifdef USE_LIVEBUFFER
+   int LiveBufferSize;
+   int LiveBufferMaxFileSize;
+--- vdr.old/config.c	2012-09-10 16:56:08.000000000 +0200
++++ vdr/config.c	2012-09-10 17:07:15.000000000 +0200
+@@ -499,6 +499,16 @@
+   ChannelsWrap = 0;
+   ShowChannelNamesWithSource = 0;
+   EmergencyExit = 1;
++  ExpertOptions  = 0;
++  AddNewChannels = 0;
++  UseBouquetList = 1;
++  OnlyRadioChannels = 0;
++  OnlyEncryptedChannels = 0;
++  OnlyHDChannels = 0;
++  ExpertNavi     = 0;
++  WantChListOnOk = 1;
++  ChannelUpDownKeyMode = 0; // 0 Normal, kChanUp and kChanDn jumps channel
++ 			   // 1 opens bouquet / channellist
+ #ifdef USE_LIVEBUFFER
+   LiveBufferSize = 15;
+   LiveBufferMaxFileSize = 100;
+@@ -628,6 +638,15 @@
+ bool cSetup::Parse(const char *Name, const char *Value)
+ {
+   if      (!strcasecmp(Name, "OSDLanguage"))       { strn0cpy(OSDLanguage, Value, sizeof(OSDLanguage)); I18nSetLocale(OSDLanguage); }
++  else if (!strcasecmp(Name, "ExpertOptions"))       ExpertOptions      = atoi(Value);
++  else if (!strcasecmp(Name, "AddNewChannels"))      AddNewChannels     = atoi(Value);
++  else if (!strcasecmp(Name, "UseBouquetList"))      UseBouquetList     = atoi(Value);
++  else if (!strcasecmp(Name, "OnlyRadioChannels"))   OnlyRadioChannels  = atoi(Value);
++  else if (!strcasecmp(Name, "OnlyEncryptedChannels"))OnlyEncryptedChannels = atoi(Value);
++  else if (!strcasecmp(Name, "OnlyHDChannels"))      OnlyHDChannels       = atoi(Value);
++  else if (!strcasecmp(Name, "ExpertNavi"))          ExpertNavi         = atoi(Value);
++  else if (!strcasecmp(Name, "WantChListOnOk"))      WantChListOnOk     = atoi(Value);
++  else if (!strcasecmp(Name, "ChannelUpDownKeyMode"))  ChannelUpDownKeyMode = atoi(Value);
+   else if (!strcasecmp(Name, "OSDSkin"))             Utf8Strn0Cpy(OSDSkin, Value, MaxSkinName);
+   else if (!strcasecmp(Name, "OSDTheme"))            Utf8Strn0Cpy(OSDTheme, Value, MaxThemeName);
+ #ifdef USE_WAREAGLEICON
+@@ -930,6 +949,15 @@
+   Store("ChannelsWrap",       ChannelsWrap);
+   Store("ShowChannelNamesWithSource", ShowChannelNamesWithSource);
+   Store("EmergencyExit",      EmergencyExit);
++  Store("ExpertOptions",      ExpertOptions);
++  Store("AddNewChannels",     AddNewChannels);
++  Store("UseBouquetList",     UseBouquetList);
++  Store("OnlyRadioChannels",  OnlyRadioChannels);
++  Store("OnlyEncryptedChannels", OnlyEncryptedChannels);
++  Store("OnlyHDChannels", OnlyHDChannels);
++  Store("ExpertNavi",         ExpertNavi);
++  Store("WantChListOnOk",     WantChListOnOk);
++  Store("ChannelUpDownKeyMode", ChannelUpDownKeyMode);
+ #ifdef USE_LIVEBUFFER
+   Store("LiveBufferSize",     LiveBufferSize);
+ #endif  /* LIVEBUFFER */
+--- vdr.old/debug.h	2012-09-10 17:01:45.255343385 +0200
++++ vdr/debug.h	2012-09-10 18:01:39.127488559 +0200
+@@ -0,0 +1,44 @@
++
++#ifndef DEBUG_H
++#define DEBUG_H
++#include <assert.h>
++
++#ifdef DBG
++  #undef DBG
++  #undef DERR
++  #undef DLOG
++  #undef PRINTF
++#endif
++
++
++#if defined DEBUG
++    #ifdef PLUGIN_NAME_I18N
++        #define CONTEXT PLUGIN_NAME_I18N
++    #else
++        #define CONTEXT "VDR"
++    #endif
++
++    // standard debug macro
++    #define DDD(x...) { printf("["CONTEXT": %s +%d, %s()]: ",__FILE__, __LINE__, __FUNCTION__); \
++                         printf(x); printf("\n"); }
++
++    // standard error macro (red background)
++    #define DERR(x...) { printf("\033[0;37m\033[1;41m["CONTEXT"]: "x); printf("\033[0m\n"); }
++
++    // special macro: logs to syslog AND console
++    #define DLOG(x...) { printf("["CONTEXT"]: "x); printf("\n"); dsyslog("["CONTEXT"]: "x); }
++
++    // for automatic conversion of printf's - i.e. use sed s/" printf"/" PRINTF"/
++    #define PRINTF(x...) printf("["CONTEXT"]: "x)
++#else
++    #define DDD(x...)
++    #define DERR(x...)
++    #define DLOG(x...)
++    #define PRINTF(x...)
++#endif
++
++//only here for compatibility reasons, don't use any more
++#define ERR "Error"
++#define DBG(x...)
++
++#endif /* DEBUG_H */
+--- vdr.old/keys.h	2010-04-05 12:06:04.000000000 +0200
++++ vdr/keys.h	2012-09-10 17:26:11.000000000 +0200
+@@ -50,6 +50,7 @@
+              kRecordings,
+              kSetup,
+              kCommands,
++	     kGreater, kLess, k2digit,
+              kUser0, kUser1, kUser2, kUser3, kUser4, kUser5, kUser6, kUser7, kUser8, kUser9,
+              kNone,
+              kKbd,
+--- vdr.old/keys.c	2010-04-05 12:05:58.000000000 +0200
++++ vdr/keys.c	2012-09-10 17:25:21.000000000 +0200
+@@ -56,6 +56,9 @@
+                     { kRecordings,    trNOOP("Key$Recordings")  },
+                     { kSetup,         trNOOP("Key$Setup")       },
+                     { kCommands,      trNOOP("Key$Commands")    },
++                    { kGreater,       trNOOP("Key$Greater")     },
++                    { kLess,          trNOOP("Key$Less")        },
++                    { k2digit,        trNOOP("Key$2digit")      },
+                     { kUser0,         trNOOP("Key$User0")       },
+                     { kUser1,         trNOOP("Key$User1")       },
+                     { kUser2,         trNOOP("Key$User2")       },
+--- vdr.old/menu.h	2012-09-10 16:56:08.000000000 +0200
++++ vdr/menu.h	2012-09-10 17:14:53.000000000 +0200
+@@ -18,6 +18,17 @@
+ #include "menuitems.h"
+ #include "recorder.h"
+ #include "skins.h"
++
++class cMenuEditSrcItem : public cMenuEditIntItem {
++private:
++  const cSource *source;
++protected:
++  virtual void Set(void);
++public:
++  cMenuEditSrcItem(const char *Name, int *Value);
++  eOSState ProcessKey(eKeys Key);
++  };
++
+ #ifdef USE_LIVEBUFFER
+ #include "livebuffer.h"
+ #endif /*USE_LIVEBUFFER*/
+@@ -111,7 +122,23 @@
+ #endif /* GRAPHTFT */
+   };
+ 
++struct MenuMainHook_Data_V1_0 {
++  eOSState  Function;    /*IN*/
++  cOsdMenu *pResultMenu; /*OUT*/
++};
++#define CREATE_MENU_MAIN(function,menu) {                              \
++  MenuMainHook_Data_V1_0 data;                                         \
++  memset(&data, 0, sizeof(data));                                      \
++  data.Function = function;                                            \
++  if (!cPluginManager::CallFirstService("MenuMainHook-V1.0", &data))   \
++    menu = new cMenuMain(function);                                    \
++  else                                                                 \
++    menu = data.pResultMenu;                                           \
++}
++ 
+ class cMenuMain : public cOsdMenu {
++protected:
++  cMenuMain(const char *Title):cOsdMenu(Title){}; // Allow custom constructor
+ private:
+ #ifdef USE_SETUP
+   int    nrDynamicMenuEntries;
+--- vdr.old/menu.c	2012-09-10 16:56:08.000000000 +0200
++++ vdr/menu.c	2012-09-10 17:12:04.000000000 +0200
+@@ -107,15 +107,6 @@
+ 
+ // --- cMenuEditSrcItem ------------------------------------------------------
+ 
+-class cMenuEditSrcItem : public cMenuEditIntItem {
+-private:
+-  const cSource *source;
+-protected:
+-  virtual void Set(void);
+-public:
+-  cMenuEditSrcItem(const char *Name, int *Value);
+-  eOSState ProcessKey(eKeys Key);
+-  };
+ 
+ cMenuEditSrcItem::cMenuEditSrcItem(const char *Name, int *Value)
+ :cMenuEditIntItem(Name, Value, 0)
+@@ -4848,6 +4839,7 @@
+             }
+          else
+             return osEnd;
++	case kInfo: return osEnd; break;
+          break;
+     default:
+          if ((Key & (k_Repeat | k_Release)) == 0) {
+--- vdr.old/osdbase.h	2012-09-10 16:56:08.000000000 +0200
++++ vdr/osdbase.h	2012-09-10 17:27:12.000000000 +0200
+@@ -40,6 +40,10 @@
+                 osSwitchDvb,
+                 osBack,
+                 osEnd,
++                osBouquets,
++                osActiveBouquet,
++                osFavourites,
++                osAddFavourite,
+ #ifdef USE_LIVEBUFFER
+                 osSwitchChannel,
+ #endif /*USE_LIVEBUFFER*/
+--- vdr.old/vdr.c	2012-09-10 16:56:08.000000000 +0200
++++ vdr/vdr.c	2012-09-10 17:19:05.000000000 +0200
+@@ -1060,6 +1060,27 @@
+           case kChanUp:
+           case kChanDn|k_Repeat:
+           case kChanDn:
++               if (Setup.ChannelUpDownKeyMode == 1 && (!Menu || cDisplayChannel::IsOpen()))
++               // only if a menu is not open
++               //  and user has opted for a different key behavior
++               {
++                   if (cDisplayChannel::IsOpen() || cControl::Control())
++                   {
++                       DELETE_MENU;
++                   }
++                   if (key == kChanDn)
++                   {
++                       DirectMainFunction(osBouquets);
++                   }
++                   else
++                   {
++                       DirectMainFunction(osActiveBouquet);
++                   }
++                   key = kNone; // nobody else sees these keys
++                   break;
++               }
++               else
++
+                if (!Interact)
+                   Menu = new cDisplayChannel(NORMALKEY(key));
+                else if (cDisplayChannel::IsOpen() || cControl::Control()) {
+@@ -1103,6 +1124,7 @@
+                break;
+           // Subtitle track control:
+           case kSubtitles:
++	case kGreater:
+                if (cControl::Control())
+                   cControl::Control()->Hide();
+                if (!cDisplaySubtitleTracks::IsOpen()) {
+@@ -1300,7 +1322,20 @@
+                   Menu = new cDisplayChannel(NORMALKEY(key));
+                   break;
+              // Viewing Control:
+-             case kOk:   LastChannel = -1; break; // forces channel display
++             case kInfo:
++             case kOk:  if ((Setup.WantChListOnOk && (key == kOk)) 
++                            || (!Setup.WantChListOnOk && (key == kInfo)) )
++                        {
++                            DirectMainFunction(osChannels);
++                        }
++                        else 
++                        {
++                            LastChannel = -1;
++                        }
++                        break;
++
++
++
+              // Instant resume of the last viewed recording:
+              case kPlay:
+                   if (cReplayControl::LastReplayed()) {

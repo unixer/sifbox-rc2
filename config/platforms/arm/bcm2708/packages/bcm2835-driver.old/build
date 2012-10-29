@@ -1,0 +1,46 @@
+#!/bin/sh
+
+. config/options
+get_meta $1
+TARGET_FLOAT="hardfp"
+cd $PKG_BUILD_DIR
+echo $TARGET_FLOAT
+echo $SYSROOT_PREFIX
+#if [ "$TARGET_FLOAT" = "softfp" -o "$TARGET_FLOAT" = "soft" ]; then
+#  FLOAT="softfp"
+#elif [ "$TARGET_FLOAT" = "hard" ]; then
+  FLOAT="hardfp"
+#fi
+
+#cd $PKG_BUILD
+mkdir -p $SYSROOT_PREFIX/usr/include
+  cp -PR $FLOAT/opt/vc/include/* $SYSROOT_PREFIX/usr/include
+
+mkdir -p $SYSROOT_PREFIX/usr/lib
+  cp -PR $FLOAT/opt/vc/lib/*.so* $SYSROOT_PREFIX/usr/lib
+
+mkdir -p .install/usr/sbin
+  cp -PR $FLOAT/opt/vc/sbin/vcfiled .install/usr/sbin
+
+mkdir -p .install/usr/lib
+  cp -PR $FLOAT/opt/vc/lib/*.so* .install/usr/lib 
+
+mkdir -p .install/usr/bin
+  cp -PR $FLOAT/opt/vc/bin/vcdbg .install/usr/bin
+  cp -PR $FLOAT/opt/vc/bin/vcgencmd .install/usr/bin
+  cp -PR $FLOAT/opt/vc/bin/tvservice .install/usr/bin
+  cp -PR $FLOAT/opt/vc/bin/edidparser .install/usr/bin
+
+mkdir -p .install/opt/vc
+  ln -sf /usr/lib .install/opt/vc/lib
+
+mkdir -p .install/sd
+  ln -sf /storage/.config/vlls .install/sd/vlls
+
+mkdir -p .install/usr/include
+  cp -PR $FLOAT/opt/vc/include/* .install/usr/include
+
+mkdir -p .install/usr/lib
+  cp -PR $FLOAT/opt/vc/lib/*.so* .install/usr/lib
+
+

@@ -1,0 +1,55 @@
+--- oscam-svn/reader-videoguard-common.c.org	2012-09-04 11:41:44.035498233 +0200
++++ oscam-svn/reader-videoguard-common.c	2012-09-04 11:42:03.839498573 +0200
+@@ -710,6 +710,30 @@
+ 			return TRUE;
+ 	}
+ }
++ 
++static uint32_t vg_emm_check(struct s_reader *reader, EMM_PACKET *ep, int32_t offs)
++{
++   struct caid_emmg_s
++   {
++      uint16_t caid;
++      uint8_t  version;
++   } caids[] =
++   {
++      { 0x0919, 0x02 },
++      { 0x093B, 0x03 },
++      { 0x09CD, 0x04 }
++   };
++   uint32_t idx;
++   if (ep->type == GLOBAL)
++   {
++      for (idx = 0; idx < sizeof(caids) / sizeof(caids[0]); ++idx)
++      {
++         if (reader->caid == caids[idx].caid)
++            return (ep->emm[offs+4] == caids[idx].version) ? OK : SKIPPED;
++      }
++   }
++   return OK;
++}
+ 
+ int32_t videoguard_do_emm(struct s_reader * reader, EMM_PACKET *ep, unsigned char CLA,
+ 	void (*read_tiers)(struct s_reader *),
+@@ -787,12 +811,15 @@
+          {
+             if (ep->type == GLOBAL || vdrsc_fix || position == ua_position)
+             {
+-               ins42[4] = ep->emm[offs];
+-               int32_t l = (*docmd)(reader, ins42, &ep->emm[offs+1], NULL, cta_res);
+-               rc = (l > 0 && status_ok(cta_res)) ? OK : ERROR;
+-               rdr_debug_mask(reader, D_EMM, "request return code : %02X%02X", cta_res[0], cta_res[1]);
+-               if (status_ok(cta_res) && (cta_res[1] & 0x01))
+-                  (*read_tiers)(reader);
++               if ((rc = vg_emm_check(reader, ep, offs)) == OK)
++               {
++                  ins42[4] = ep->emm[offs];
++                  int32_t l = (*docmd)(reader, ins42, &ep->emm[offs+1], NULL, cta_res);
++                  rc = (l > 0 && status_ok(cta_res)) ? OK : ERROR;
++                  rdr_debug_mask(reader, D_EMM, "request return code : %02X%02X", cta_res[0], cta_res[1]);
++                  if (status_ok(cta_res) && (cta_res[1] & 0x01))
++                     (*read_tiers)(reader);
++               }
+             }
+             offs += ep->emm[offs] + 1;
+             if (offs < ep->l && ep->emm[offs] == 0x00) ++offs;

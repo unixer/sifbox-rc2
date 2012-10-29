@@ -1,0 +1,19 @@
+#!/bin/sh
+
+. config/options
+
+export LD_LIBRARY_PATH=$SYSROOT_PREFIX/lib:$SYSROOT_PREFIX/usr/local/lib:$LD_LIBRARY_PATH
+
+cd $BUILD/$1*
+sed -i 's#) ytasm.*#)#' Makefile.in
+
+do_configure host
+
+#do_configure \
+#	--host=$TARGET_NAME \
+#        --build=$HOST \
+#        --target=$HOST \
+
+
+make
+make_install toolchain

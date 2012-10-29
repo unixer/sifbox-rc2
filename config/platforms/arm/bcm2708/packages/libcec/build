@@ -1,0 +1,24 @@
+#!/bin/sh
+
+. config/options
+get_meta $1
+
+cd $PKG_BUILD_DIR
+
+do_autoconf
+
+LIBCEC_RPI="--enable-rpi --with-rpi-include-path=$SYSROOT_PREFIX/usr/include --with-rpi-lib-path=$SYSROOT_PREFIX/usr/lib"
+
+# dont use some optimizations because of build problems
+  LDFLAGS=`echo $LDFLAGS | sed -e "s|-Wl,--as-needed||"`
+
+do_configure --host=$TARGET_NAME \
+            --build=$HOST_NAME \
+            --prefix=/usr \
+            --sysconfdir=/etc \
+            --disable-static \
+            --enable-shared \
+            $LIBCEC_RPI
+
+make
+make_install

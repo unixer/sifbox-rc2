@@ -1,0 +1,22 @@
+#!/bin/sh
+
+. config/options
+#LD_LIBRARY_PATH=$SYSROOT_PREFIX/lib:$LD_LIBRARY_PATH
+
+cd $BUILD/$1*
+  CFLAGS=`echo $CFLAGS | sed -e "s|-flto||g"`
+  CFLAGS=`echo $CFLAGS | sed -e "s|-fexcess-precision=fast||g"`
+  CFLAGS=`echo $CFLAGS | sed -e "s|-D_FILE_OFFSET_BITS=64||g"`
+  CXXFLAGS=`echo $CXXFLAGS | sed -e "s|-flto||g"`
+  LDFLAGS=`echo $LDFLAGS | sed -e "s|-flto -fexcess-precision=fast||g"`
+
+  LDFLAGS=`echo $LDFLAGS | sed -e "s|-Wl,--as-needed||"`
+  CFLAGS=`echo $CFLAGS | sed -e "s|-O2||"`
+echo $CFLAGS
+echo $LDFLAGS
+read enterKey
+#unset CFLAGS
+
+GCC_NO_LTO=1 GCC_NO_GOLD=1 GCC_NO_GRAPHITE=1 GCC_NO_LOOP_TREE=1 \
+make
+make_install

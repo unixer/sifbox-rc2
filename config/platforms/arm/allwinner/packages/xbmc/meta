@@ -1,0 +1,7 @@
+PKG_NAME=xbmc
+PKG_VERSION=76b0fa16f0
+PKG_URL_REV=76b0fa16f0
+PKG_URL_PROTO=
+#PKG_URL="git://github.com/empatzero/xbmca10.git"
+PKG_URL="http://dl.dropbox.com/u/23897246/xbmc-76b0fa16f0.tar.xz"
+PKG_REV=1
